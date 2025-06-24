@@ -7,9 +7,15 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+    return
 # 로깅 설정
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+username = os.environ.get('RIDIBOOKS_USERNAME')
+password = os.environ.get('RIDIBOOKS_PASSWORD')
+logger.info(f"Username provided: {'Yes' if username else 'No'}")
+logger.info(f"Password provided: {'Yes' if password else 'No'}")
+if not username or not password:
+    logger.error("사용자 이름 또는 비밀번호가 제공되지 않음")
 
 def login(driver, username, password):
     """리디북스에 로그인"""
