@@ -14,6 +14,8 @@ username = os.environ.get('RIDIBOOKS_USERNAME')
 password = os.environ.get('RIDIBOOKS_PASSWORD')
 logger.info(f"Username provided: {'Yes' if username else 'No'}")
 logger.info(f"Password provided: {'Yes' if password else 'No'}")
+RIDIBOOKS_USERNAME: ${{ secrets.RIDIBOOKS_USERNAME }}
+RIDIBOOKS_PASSWORD: ${{ secrets.RIDIBOOKS_PASSWORD }}
 if not username or not password:
     logger.error("사용자 이름 또는 비밀번호가 제공되지 않음")
 
