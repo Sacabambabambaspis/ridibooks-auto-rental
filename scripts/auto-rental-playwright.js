@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+const { chromium } = require('playwright');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -47,22 +47,22 @@ class RidiBooksAutoRental {
     async init() {
         await this.log('브라우저 초기화 중...');
         
-        this.browser = await puppeteer.launch({
+        this.browser = await chromium.launch({
             headless: true,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor'
+                '--disable-dev-shm-usage'
             ]
         });
 
         this.page = await this.browser.newPage();
-        await this.page.setViewport({ width: 1280, height: 720 });
+        await this.page.setViewportSize({ width: 1280, height: 720 });
         
         // User-Agent 설정
-        await this.page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        await this.page.setExtraHTTPHeaders({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        });
     }
 
     async login() {
@@ -70,23 +70,23 @@ class RidiBooksAutoRental {
         
         try {
             await this.page.goto('https://ridibooks.com/account/login', {
-                waitUntil: 'networkidle2',
+                waitUntil: 'networkidle',
                 timeout: 30000
             });
 
             // 이메일 입력
             await this.page.waitForSelector('input[name="user_id"]', { timeout: 10000 });
-            await this.page.type('input[name="user_id"]', process.env.RIDI_EMAIL);
+            await this.page.fill('input[name="user_id"]', process.env.RIDI_EMAIL);
 
             // 비밀번호 입력
             await this.page.waitForSelector('input[name="password"]', { timeout: 10000 });
-            await this.page.type('input[name="password"]', process.env.RIDI_PASSWORD);
+            await this.page.fill('input[name="password"]', process.env.RIDI_PASSWORD);
 
             // 로그인 버튼 클릭
             await this.page.click('button[type="submit"]');
             
             // 로그인 완료 대기
-            await this.page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
+            await this.page.waitForNavigation({ waitUntil: 'networkidle', timeout: 15000 });
             
             await this.log('로그인 성공');
             return true;
@@ -101,23 +101,50 @@ class RidiBooksAutoRental {
         
         try {
             await this.page.goto('https://ridibooks.com/notification?tab=3', {
-                waitUntil: 'networkidle2',
+                waitUntil: 'networkidle',
                 timeout: 30000
             });
 
             // 알림 목록 대기
-            await this.page.waitForSelector('.notification-list', { timeout: 10000 });
+            await this.page.waitForSelector('.notification-list, .notification-item, [class*="notification"]', { timeout: 10000 });
 
             // 24시간 이내의 새로운 알림 찾기
             const notifications = await this.page.evaluate(() => {
-                const now = new Date();
-                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                // 다양한 셀렉터로 알림 아이템 찾기
+                const possibleSelectors = [
+                    '.notification-item',
+                    '.notification-list-item',
+                    '[data-notification]',
+                    '.alert-item',
+                    '[class*="notification"]'
+                ];
                 
-                const notificationItems = document.querySelectorAll('.notification-item');
+                let notificationItems = [];
+                for (const selector of possibleSelectors) {
+                    const items = document.querySelectorAll(selector);
+                    if (items.length > 0) {
+                        notificationItems = Array.from(items);
+                        break;
+                    }
+                }
+
                 const newNotifications = [];
 
                 notificationItems.forEach(item => {
-                    const timeElement = item.querySelector('.notification-time');
+                    // 시간 요소 찾기
+                    const timeSelectors = [
+                        '.notification-time',
+                        '.time',
+                        '.timestamp',
+                        '[class*="time"]'
+                    ];
+                    
+                    let timeElement = null;
+                    for (const selector of timeSelectors) {
+                        timeElement = item.querySelector(selector);
+                        if (timeElement) break;
+                    }
+                    
                     if (!timeElement) return;
 
                     const timeText = timeElement.textContent.trim();
@@ -128,8 +155,21 @@ class RidiBooksAutoRental {
                                    (timeText.includes('일 전') && parseInt(timeText) === 1);
 
                     if (isRecent) {
-                        const titleElement = item.querySelector('.notification-title');
-                        const linkElement = item.querySelector('a');
+                        // 제목과 링크 찾기
+                        const titleSelectors = [
+                            '.notification-title',
+                            '.title',
+                            'h3', 'h4', 'h5',
+                            '[class*="title"]'
+                        ];
+                        
+                        let titleElement = null;
+                        for (const selector of titleSelectors) {
+                            titleElement = item.querySelector(selector);
+                            if (titleElement) break;
+                        }
+                        
+                        const linkElement = item.querySelector('a') || item.closest('a');
                         
                         if (titleElement && linkElement) {
                             newNotifications.push({
@@ -158,24 +198,55 @@ class RidiBooksAutoRental {
         try {
             // 알림 링크로 이동
             await this.page.goto(notification.link, {
-                waitUntil: 'networkidle2',
+                waitUntil: 'networkidle',
                 timeout: 30000
             });
 
             // 기다무 대여 버튼 찾기
             await this.page.waitForTimeout(2000);
             
-            const rentalButton = await this.page.$('.free-rental-btn, .rental-btn, button[data-rental="free"]');
+            const rentalSelectors = [
+                '.free-rental-btn',
+                '.rental-btn',
+                'button[data-rental="free"]',
+                '[class*="free"][class*="rental"]',
+                'button[class*="free"]',
+                '.btn-free-rental'
+            ];
+            
+            let rentalButton = null;
+            for (const selector of rentalSelectors) {
+                try {
+                    rentalButton = await this.page.$(selector);
+                    if (rentalButton) break;
+                } catch (e) {
+                    continue;
+                }
+            }
             
             if (rentalButton) {
                 await rentalButton.click();
                 await this.page.waitForTimeout(3000);
                 
                 // 대여 확인 버튼이 있는지 확인
-                const confirmButton = await this.page.$('.confirm-btn, .modal-confirm');
-                if (confirmButton) {
-                    await confirmButton.click();
-                    await this.page.waitForTimeout(2000);
+                const confirmSelectors = [
+                    '.confirm-btn',
+                    '.modal-confirm',
+                    'button[class*="confirm"]',
+                    '.btn-confirm'
+                ];
+                
+                for (const selector of confirmSelectors) {
+                    try {
+                        const confirmButton = await this.page.$(selector);
+                        if (confirmButton) {
+                            await confirmButton.click();
+                            await this.page.waitForTimeout(2000);
+                            break;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
                 }
                 
                 await this.log(`대여 완료: ${notification.title}`);
