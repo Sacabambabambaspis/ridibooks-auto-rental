@@ -8,7 +8,7 @@
     "test": "node test/test-rental.js"
   },
   "dependencies": {
-    "puppeteer": "^21.0.0",
+    "puppeteer": "^22.15.0",
     "node-fetch": "^3.3.2"
   },
   "engines": {
