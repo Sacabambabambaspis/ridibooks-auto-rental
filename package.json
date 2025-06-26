@@ -1,0 +1,25 @@
+{
+  "name": "ridibooks-auto-rental",
+  "version": "1.0.0",
+  "description": "리디북스 기다무 자동 대여 시스템",
+  "main": "scripts/auto-rental.js",
+  "scripts": {
+    "start": "node scripts/auto-rental.js",
+    "test": "node test/test-rental.js"
+  },
+  "dependencies": {
+    "puppeteer": "^21.0.0",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "ridibooks",
+    "automation",
+    "rental",
+    "github-actions"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
