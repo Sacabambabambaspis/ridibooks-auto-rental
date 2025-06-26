@@ -19,10 +19,21 @@ jobs:
       with:
         node-version: '18'
         
+    - name: Puppeteer 캐시 설정
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/puppeteer
+        key: ${{ runner.os }}-puppeteer-${{ hashFiles('package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-puppeteer-
+          
     - name: 의존성 설치
       run: |
-        npm install puppeteer
-        npm install node-fetch
+        npm ci --prefer-offline --no-audit
+        # Puppeteer 설치 시 타임아웃 방지
+        npm config set fetch-timeout 600000
+        npm config set fetch-retry-mintimeout 20000
+        npm config set fetch-retry-maxtimeout 120000
         
     - name: 리디북스 자동 대여 실행
       env:
