@@ -1,0 +1,41 @@
+name: 리디북스 자동 대여 시스템
+
+on:
+  schedule:
+    # 3시간마다 실행 (00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00)
+    - cron: '0 */3 * * *'
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  auto-rental:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+    
+    - name: Node.js 설정
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: 의존성 설치
+      run: |
+        npm install puppeteer
+        npm install node-fetch
+        
+    - name: 리디북스 자동 대여 실행
+      env:
+        RIDI_EMAIL: ${{ secrets.RIDI_EMAIL }}
+        RIDI_PASSWORD: ${{ secrets.RIDI_PASSWORD }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: node scripts/auto-rental.js
+      
+    - name: 로그 저장
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: rental-logs
+        path: logs/
+        retention-days: 7
