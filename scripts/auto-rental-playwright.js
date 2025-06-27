@@ -4,7 +4,10 @@ const fs = require('fs').promises;
 async function debugLoginPage() {
     console.log('리디북스 로그인 페이지 분석 시작...');
     
-    const browser = await chromium.launch({ headless: false }); // headless: false로 브라우저 화면 보기
+    const browser = await chromium.launch({
+  headless: true, // Add this line
+  // ... other options
+});
     const page = await browser.newPage();
     
     try {
